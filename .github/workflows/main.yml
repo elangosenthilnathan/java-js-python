@@ -1,0 +1,24 @@
+---
+name: qwiet.ai
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+
+jobs:
+  NextGen-Static-Analysis:
+    runs-on: ubuntu-latest
+    container: shiftleft/core:latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+
+    - name: preZero Static Analysis
+      run: |
+
+        ${GITHUB_WORKSPACE}/sl analyze --strict --wait --verbose \
+          --app java-js-python .
+      env:
+        SHIFTLEFT_ACCESS_TOKEN: ${{ secrets.SHIFTLEFT_ACCESS_TOKEN }}
