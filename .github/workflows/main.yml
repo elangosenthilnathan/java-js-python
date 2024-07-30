@@ -21,6 +21,6 @@ jobs:
         mkdir temp
         chmod -x temp
         #sl analyze --strict --wait --verbose --app java-js-python .
-        docker run --rm -t --name slcore -e SHIFTLEFT_ACCESS_TOKEN="$SHIFTLEFT_ACCESS_TOKEN" -e QWIET_ENABLE_MULTI_LANGUAGE_ANALYSIS=true -e SHIFTLEFT_JAVA_OPTS=-Djava.io.tmpdir=$PWD/temp -e TMPDIR=$PWD/temp -v $PWD:/app -v $PWD/temp:/tmp shiftleft/core sl analyze --verbose --app  java-python-js /app
+        docker run --rm -t --name slcore -e SHIFTLEFT_ACCESS_TOKEN="$SHIFTLEFT_ACCESS_TOKEN" -e QWIET_ENABLE_MULTI_LANGUAGE_ANALYSIS=true -e SHIFTLEFT_JAVA_OPTS=-Djava.io.tmpdir=temp -e TMPDIR=temp -v $PWD:/app -v $PWD/temp:/tmp shiftleft/core sl analyze --verbose --app  java-python-js /app
       env:
         SHIFTLEFT_ACCESS_TOKEN: ${{ secrets.SHIFTLEFT_ACCESS_TOKEN }}
