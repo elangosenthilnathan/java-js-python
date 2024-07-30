@@ -18,7 +18,7 @@ jobs:
     - name: preZero Static Analysis
       run: |
         export QWIET_ENABLE_MULTI_LANGUAGE_ANALYSIS=true
-        chmod -wx /tmp
+        chmod -wx $pwd
         #sl analyze --strict --wait --verbose --app java-js-python .
         docker run --rm -t --name slcore -e SHIFTLEFT_ACCESS_TOKEN="$SHIFTLEFT_ACCESS_TOKEN" -v $PWD:/app -v $PWD:/tmp shiftleft/core sl analyze --verbose --app  java-python-js /app
       env:
