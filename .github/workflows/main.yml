@@ -17,7 +17,7 @@ jobs:
 
     - name: preZero Static Analysis
       run: |
-        sl analyze --verbose --app java-js-python . -- --no-tsTypes
+        sl analyze --verbose --app java-js-python . -- --js.no-tsTypes
         #docker run --rm -t --name slcore -e SHIFTLEFT_ACCESS_TOKEN="$SHIFTLEFT_ACCESS_TOKEN" -e QWIET_ENABLE_MULTI_LANGUAGE_ANALYSIS=true -e SHIFTLEFT_JAVA_OPTS=-Djava.io.tmpdir=temp -e TMPDIR=temp -v $PWD:/app -v $PWD/temp:/tmp shiftleft/core sl analyze --verbose --app  java-python-js /app
         #docker run -ti -v /home/mp:/shared --tmpfs /tmp:noexec shiftleft/core:latest SHIFTLEFT_JAVA_OPTS=-Djava.io.tmpdir=/root TMPDIR=/root sl analyze --jssrc . -- --js.no-tsTypes
       env:
