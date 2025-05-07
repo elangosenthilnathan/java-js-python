@@ -217,51 +217,85 @@ public class CustomerController {
    * @throws Exception
    */
   @RequestMapping(value = "/saveSettings", method = RequestMethod.GET)
-  public void saveSettings(HttpServletResponse httpResponse, WebRequest request) throws Exception {
-    // "Settings" will be stored in a cookie
-    // schema: base64(filename,value1,value2...), md5sum(base64(filename,value1,value2...))
+@Autowired
+private SecureFileService secureFileService;  // Added secure file service
 
-    if (!checkCookie(request)){
-      httpResponse.getOutputStream().println("Error");
-      throw new Exception("cookie is incorrect");
-    }
+@RequestMapping(value = "/saveSettings", method = RequestMethod.GET)
+public void saveSettings(HttpServletResponse httpResponse, WebRequest request) throws Exception {
+  // "Settings" will be stored in a cookie
+  // schema: base64(filename,value1,value2...), md5sum(base64(filename,value1,value2...))
 
-    String settingsCookie = request.getHeader("Cookie");
-    String[] cookie = settingsCookie.split(",");
-	if(cookie.length<2) {
-	  httpResponse.getOutputStream().println("Malformed cookie");
-      throw new Exception("cookie is incorrect");
-    }
-
-    String base64txt = cookie[0].replace("settings=","");
-
-    // Check md5sum
-    String cookieMD5sum = cookie[1];
-    String calcMD5Sum = DigestUtils.md5Hex(base64txt);
-	if(!cookieMD5sum.equals(calcMD5Sum))
-    {
-      httpResponse.getOutputStream().println("Wrong md5");
-      throw new Exception("Invalid MD5");
-    }
-
-    // Now we can store on filesystem
-    String[] settings = new String(Base64.getDecoder().decode(base64txt)).split(",");
-	// storage will have ClassPathResource as basepath
-    ClassPathResource cpr = new ClassPathResource("./static/");
-	  File file = new File(cpr.getPath()+settings[0]);
-    if(!file.exists()) {
-      file.getParentFile().mkdirs();
-    }
-
-    FileOutputStream fos = new FileOutputStream(file, true);
-    // First entry is the filename -> remove it
-    String[] settingsArr = Arrays.copyOfRange(settings, 1, settings.length);
-    // on setting at a linez
-    fos.write(String.join("\n",settingsArr).getBytes());
-    fos.write(("\n"+cookie[cookie.length-1]).getBytes());
-    fos.close();
-    httpResponse.getOutputStream().println("Settings Saved");
+  if (!checkCookie(request)){
+    httpResponse.getOutputStream().println("Error");
+    throw new Exception("cookie is incorrect");
   }
+
+  String settingsCookie = request.getHeader("Cookie");
+  String[] cookie = settingsCookie.split(",");
+  if(cookie.length<2) {
+    httpResponse.getOutputStream().println("Malformed cookie");
+    throw new Exception("cookie is incorrect");
+  }
+
+  String base64txt = cookie[0].replace("settings=","");
+
+  // Check md5sum
+  String cookieMD5sum = cookie[1];
+  String calcMD5Sum = DigestUtils.md5Hex(base64txt);
+  if(!cookieMD5sum.equals(calcMD5Sum))
+  {
+    httpResponse.getOutputStream().println("Wrong md5");
+    throw new Exception("Invalid MD5");
+  }
+
+  // Now we can store on filesystem
+  String[] settings = new String(Base64.getDecoder().decode(base64txt)).split(",");
+  
+  // Get the intended base directory as absolute canonical path
+  ClassPathResource cpr = new ClassPathResource("./static/");
+  File baseDirectory = new File(cpr.getPath()).getCanonicalFile();
+  String basePath = baseDirectory.getPath();
+  
+  // Use Path normalization for robust path handling
+  Path requestedPath = Paths.get(settings[0]).normalize();
+  String filename = requestedPath.getFileName().toString();
+  
+  // Implement whitelist validation for filenames
+  if (!filename.matches("[a-zA-Z0-9_\\-\\.]+")) {
+    throw new SecurityException("Invalid filename format");
+  }
+  
+  // Regex-based detection for path traversal attempts
+  Pattern traversalPattern = Pattern.compile("\\.\\.|/\\.\\./|\\\\\\.\\.\\\\");
+  if (traversalPattern.matcher(settings[0]).find()) {
+    throw new SecurityException("Directory traversal attempt detected");
+  }
+  
+  // Generate a UUID for the file to avoid direct use of user input
+  String fileId = UUID.randomUUID().toString() + "_" + FilenameUtils.getName(filename);
+  
+  // Create a file within the base directory only
+  File file = new File(baseDirectory, fileId);
+  
+  // Verify the file is within the intended directory before proceeding
+  if (!file.getCanonicalPath().startsWith(basePath)) {
+    throw new SecurityException("Directory traversal attempt detected");
+  }
+  
+  // Create parent directories if needed
+  if(!file.exists()) {
+    file.getParentFile().mkdirs();
+  }
+
+  // Extract settings content
+  String[] settingsArr = Arrays.copyOfRange(settings, 1, settings.length);
+  String content = String.join("\n", settingsArr) + "\n" + cookie[cookie.length-1];
+  
+  // Use secure file service instead of direct file operations
+  secureFileService.writeFile(file.getAbsolutePath(), content.getBytes());
+  
+  httpResponse.getOutputStream().println("Settings Saved");
+}
 
   /**
    * Debug test for saving and reading a customer
