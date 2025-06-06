@@ -8,11 +8,57 @@ class Order {
     // Hash Key
     return key;
   }
-  encryptData(secretText) {
-    // Weak encryption
-    const desCipher = crypto.createCipheriv('des', encryptionKey);
-    return desCipher.update(secretText, 'utf8', 'hex');
+encryptData(secretText) {
+  try {
+    // Generate cryptographically secure random values for IV and salt
+    const iv = crypto.randomBytes(16);
+    const salt = crypto.randomBytes(16); // Improved: Using random salt instead of hardcoded value
+    
+    // Use environment variable or secret management service instead of hardcoded key
+    const encryptionKey = process.env.ENCRYPTION_KEY || throw new Error('Encryption key not configured');
+    
+    // Improved: Added cost parameters to scrypt for better security
+    const key = crypto.scryptSync(encryptionKey, salt.toString('hex'), 32, {
+      N: 16384, // CPU/memory cost parameter
+      r: 8,     // Block size parameter
+      p: 1      // Parallelization parameter
+    });
+    
+    // Replace weak DES with AES-256-GCM for strong authenticated encryption
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    let encrypted = cipher.update(secretText, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    // Get authentication tag for verified decryption
+    const authTag = cipher.getAuthTag().toString('hex');
+    
+    // Improved: Added key version for future rotation capability
+    const keyVersion = '1';
+    
+    // Improved: Security - clear sensitive data from memory
+    setTimeout(() => {
+      key.fill(0); // Zero out the key in memory when done
+    }, 0);
+    
+    // Return all necessary components for secure decryption
+    return {
+      ciphertext: encrypted,
+      iv: iv.toString('hex'),
+      salt: salt.toString('hex'),
+      authTag: authTag,
+      version: keyVersion
+    };
+  } catch (error) {
+    // Improved: Added proper error handling
+    console.error('Encryption error occurred');
+    // Log safely without exposing sensitive details
+    return {
+      error: 'ENCRYPTION_FAILED',
+      success: false
+    };
   }
+}
+
 
 decryptData(encryptedText) {
   try {
