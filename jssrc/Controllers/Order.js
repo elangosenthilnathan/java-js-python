@@ -14,10 +14,96 @@ class Order {
     return desCipher.update(secretText, 'utf8', 'hex');
   }
 
-  decryptData(encryptedText) {
-    const desCipher = crypto.createDecipheriv('des', encryptionKey);
-    return desCipher.update(encryptedText);
+decryptData(encryptedText) {
+  try {
+    // Input validation
+    if (!Buffer.isBuffer(encryptedText) && typeof encryptedText !== 'string') {
+      throw new Error("Invalid input type: expected Buffer or string");
+    }
+    
+    const buffer = Buffer.isBuffer(encryptedText) ? encryptedText : Buffer.from(encryptedText, 'base64');
+    
+    // Extract version byte for key rotation support
+    const version = buffer[0];
+    // Retrieve encryption key based on version
+    const encryptionKey = this.getEncryptionKey(version);
+    
+    if (!encryptionKey) {
+      throw new Error("Unsupported encryption version");
+    }
+    
+    // Extract IV (16 bytes after version byte)
+    const iv = buffer.slice(1, 17);
+    
+    // Extract authentication tag (last 16 bytes)
+    const authTag = buffer.slice(-16);
+    
+    // Extract the actual encrypted content
+    const encryptedContent = buffer.slice(17, -16);
+    
+    // Choose algorithm based on version
+    const algorithm = this.getAlgorithm(version);
+    
+    // Create decipher with the determined algorithm
+    const decipher = crypto.createDecipheriv(algorithm, encryptionKey, iv);
+    
+    // Set authentication tag for verified decryption with constant-time comparison
+    decipher.setAuthTag(authTag);
+    
+    // Decrypt and return the data
+    const decrypted = decipher.update(encryptedContent);
+    return Buffer.concat([decrypted, decipher.final()]).toString('utf8');
+  } catch (error) {
+    // Enhanced error handling that doesn't leak sensitive information
+    this.logDecryptionFailure(error, { version: buffer?.[0] });
+    throw new Error("Decryption failed: data may be corrupted or tampered with");
   }
+}
+
+// Helper method to get the appropriate encryption key based on version
+getEncryptionKey(version) {
+  // Key management system implementation
+  const keyInfo = config.keys[version] || config.keys.default;
+  
+  if (!keyInfo) return null;
+  
+  if (keyInfo.derived) {
+    // Use scrypt for key derivation from password
+    const scryptAsync = promisify(crypto.scrypt);
+    // Using salt stored in configuration
+    return scryptAsync(keyInfo.password, keyInfo.salt, keyInfo.keyLength);
+  }
+  
+  // Return pre-computed key
+  return Buffer.from(keyInfo.key, 'hex');
+}
+
+// Helper method to determine which algorithm to use based on version
+getAlgorithm(version) {
+  const algorithmMap = {
+    1: 'aes-256-gcm',
+    2: 'chacha20-poly1305'
+  };
+  
+  return algorithmMap[version] || 'aes-256-gcm'; // Default to AES
+}
+
+// Secure logging of decryption failures
+logDecryptionFailure(error, metadata) {
+  // Implement secure logging with no sensitive data
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    event: 'decryption_failure',
+    errorType: error.name,
+    metadata: {
+      version: metadata.version
+    }
+  };
+  
+  // Log to secure channel without exposing sensitive details
+  console.error(JSON.stringify(logEntry));
+}
+
   addToOrder(req, res) {
     const order = req.body;
     console.log(req.body);
